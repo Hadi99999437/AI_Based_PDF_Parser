@@ -2,8 +2,7 @@
 
 import sys
 import os
-
-import fitz
+import pymupdf as fitz
 
 
 def extract_text(pdf_path: str) -> str:
