@@ -16,3 +16,5 @@ processed/*.pdf
 .DS_Store
 .vscode/
 .idea/
+
+vector_index.json
