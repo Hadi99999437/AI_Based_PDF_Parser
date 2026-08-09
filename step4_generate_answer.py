@@ -1,15 +1,3 @@
-"""
-step4_generate_answer.py
---------------------------
-This is the piece that turns "search" into actual RAG.
-
-Step 3 found the most relevant raw chunks. This step takes those chunks,
-puts them into a prompt as CONTEXT, and asks the model to answer the
-specific question using only that context - so instead of getting back
-a whole raw paragraph, you get a precise, direct answer.
-
-pip install pymupdf openai python-dotenv numpy
-"""
 
 import os
 import sys
@@ -71,8 +59,13 @@ if __name__ == "__main__":
         if question.lower() in ("quit", "exit"):
             break
 
-        top_matches = find_most_relevant(question, chunks, chunk_vectors, top_k=3)
+        top_k = min(len(chunks), 5)
+        top_matches = find_most_relevant(question, chunks, chunk_vectors, top_k=top_k)
         relevant_chunks = [chunk for score, chunk in top_matches]
+
+        print("\n[retrieved chunks for this question:]")
+        for score, chunk in top_matches:
+            print(f"  score={score:.3f} | {chunk[:80]}...")
 
         answer = generate_answer(question, relevant_chunks)
 
