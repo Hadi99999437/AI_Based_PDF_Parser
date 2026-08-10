@@ -1,48 +1,93 @@
+"""
+app.py
+--------
+Streamlit UI on top of everything already built. Two ways to get PDFs in:
+  1. Upload directly here (processed immediately, right in this UI)
+  2. Drop into incoming/ with watch_folder.py running (fully automated)
+Both write to the same persisted index, so either path works interchangeably.
 
+Run with: streamlit run app.py
+"""
+
+import os
+import tempfile
 
 import streamlit as st
 
 import step8_langgraph_workflow as workflow
-from persistence import load_index
+from persistence import load_index, append_to_index
+from step7_unified_multimodal_rag import extract_text_chunks, extract_and_caption_images, embed_text
 
 st.set_page_config(page_title="AI Based PDF Parser", page_icon="📄")
 st.title("📄 AI Based PDF Parser")
 st.caption(
-    "Multimodal RAG over documents auto-ingested by watch_folder.py. "
-    "Drop PDFs into the incoming/ folder (with the watcher running) — "
-    "they'll show up here automatically once processed."
+    "Multimodal RAG over your documents. Upload a PDF below, or drop one "
+    "into the incoming/ folder while watch_folder.py is running — either way "
+    "works."
 )
 
-index = load_index()
-
-if not index:
-    st.warning(
-        "No documents ingested yet. Run `python watch_folder.py` in a terminal "
-        "and drop a PDF into the incoming/ folder, then refresh this page."
-    )
-    st.stop()
-
-# Quick summary of what's been ingested
-sources = sorted(set(item.get("source_file", "unknown") for item in index))
-text_count = sum(1 for item in index if item["modality"] == "text")
-image_count = sum(1 for item in index if item["modality"] == "image")
-
 with st.sidebar:
-    st.header("Indexed so far")
-    st.metric("Documents", len(sources))
-    st.metric("Text chunks", text_count)
-    st.metric("Image captions", image_count)
+    st.header("Add a document")
+    uploaded_file = st.file_uploader("Upload a PDF", type=["pdf"])
+
+    if uploaded_file is not None:
+        if st.button("Ingest this PDF", type="primary"):
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                tmp.write(uploaded_file.getvalue())
+                tmp_path = tmp.name
+
+            status = st.status(f"Processing {uploaded_file.name}...", expanded=True)
+            try:
+                status.write("Extracting text...")
+                text_items = extract_text_chunks(tmp_path)
+
+                status.write(f"Extracting and captioning images ({len(text_items)} text chunks found so far)...")
+                image_items = extract_and_caption_images(tmp_path)
+
+                all_items = text_items + image_items
+                status.write(f"Embedding {len(all_items)} items...")
+                for item in all_items:
+                    item["vector"] = embed_text(item["content"])
+                    item["source_file"] = uploaded_file.name
+
+                append_to_index(all_items)
+                status.update(label=f"Done — {uploaded_file.name} is now searchable", state="complete")
+            except Exception as e:
+                status.update(label=f"Failed: {e}", state="error")
+            finally:
+                os.unlink(tmp_path)
+
+            st.rerun()
+
     st.divider()
-    st.caption("Files:")
-    for s in sources:
-        st.caption(f"• {s}")
-    st.divider()
+
+    index = load_index()
+
+    if not index:
+        st.info("No documents ingested yet. Upload a PDF above to get started.")
+    else:
+        sources = sorted(set(item.get("source_file", "unknown") for item in index))
+        text_count = sum(1 for item in index if item["modality"] == "text")
+        image_count = sum(1 for item in index if item["modality"] == "image")
+
+        st.header("Indexed so far")
+        st.metric("Documents", len(sources))
+        st.metric("Text chunks", text_count)
+        st.metric("Image captions", image_count)
+        st.caption("Files:")
+        for s in sources:
+            st.caption(f"• {s}")
+
     if st.button("Refresh"):
         st.rerun()
 
+if not index:
+    st.stop()
+
 workflow.INDEX = index
-if "graph" not in st.session_state:
+if st.session_state.get("indexed_count") != len(index):
     st.session_state.graph = workflow.build_graph()
+    st.session_state.indexed_count = len(index)
 
 question = st.text_input("Ask a question about the ingested documents")
 
