@@ -18,8 +18,14 @@ import streamlit as st
 # (not a .env file, since .env is gitignored and never gets deployed).
 # This bridges that into a normal environment variable, so the exact same
 # code below works identically whether running locally or deployed.
-if "OPENAI_API_KEY" in st.secrets:
-    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+# Wrapped in try/except because merely CHECKING st.secrets throws an error
+# locally if no secrets.toml file exists at all - which is expected when
+# running locally with a .env file instead.
+try:
+    if "OPENAI_API_KEY" in st.secrets:
+        os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+except Exception:
+    pass  # no secrets.toml - fine locally, .env (via load_dotenv elsewhere) covers it
 
 import step8_langgraph_workflow as workflow
 from persistence import load_index, append_to_index
