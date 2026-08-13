@@ -14,6 +14,13 @@ import tempfile
 
 import streamlit as st
 
+# On Streamlit Cloud, secrets are set via the app's Settings > Secrets panel
+# (not a .env file, since .env is gitignored and never gets deployed).
+# This bridges that into a normal environment variable, so the exact same
+# code below works identically whether running locally or deployed.
+if "OPENAI_API_KEY" in st.secrets:
+    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+
 import step8_langgraph_workflow as workflow
 from persistence import load_index, append_to_index
 from step7_unified_multimodal_rag import extract_text_chunks, extract_and_caption_images, embed_text
@@ -79,6 +86,7 @@ with st.sidebar:
             st.caption(f"• {s}")
 
     if st.button("Refresh"):
+        st.toast(f"Refreshed — {len(load_index())} items currently indexed")
         st.rerun()
 
 if not index:
