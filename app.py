@@ -28,7 +28,7 @@ except Exception:
     pass  # no secrets.toml - fine locally, .env (via load_dotenv elsewhere) covers it
 
 import step8_langgraph_workflow as workflow
-from persistence import load_index, append_to_index
+from persistence import load_index, append_to_index, remove_source, clear_all
 from step7_unified_multimodal_rag import extract_text_chunks, extract_and_caption_images, embed_text
 
 st.set_page_config(page_title="AI Based PDF Parser", page_icon="📄")
@@ -89,11 +89,23 @@ with st.sidebar:
         st.metric("Image captions", image_count)
         st.caption("Files:")
         for s in sources:
-            st.caption(f"• {s}")
+            col1, col2 = st.columns([4, 1])
+            col1.caption(f"• {s}")
+            if col2.button("🗑", key=f"delete_{s}", help=f"Remove {s} from the index"):
+                remove_source(s)
+                st.toast(f"Removed {s}")
+                st.rerun()
+
+        if st.button("Clear all documents", type="secondary"):
+            clear_all()
+            st.toast("Cleared all documents")
+            st.rerun()
 
     if st.button("Refresh"):
         st.toast(f"Refreshed — {len(load_index())} items currently indexed")
-        st.rerun()
+        # NOTE: no st.rerun() here - clicking a button already triggers a full
+        # script rerun on its own. Calling st.rerun() again was interrupting
+        # the toast before the browser could render it.
 
 if not index:
     st.stop()

@@ -34,3 +34,16 @@ def append_to_index(new_items: list[dict]) -> list[dict]:
     combined = existing + new_items
     save_index(combined)
     return combined
+
+
+def remove_source(source_file: str) -> list[dict]:
+    """Removes every item that came from a given source file, saves the result."""
+    existing = load_index()
+    remaining = [item for item in existing if item.get("source_file") != source_file]
+    save_index(remaining)
+    return remaining
+
+
+def clear_all() -> None:
+    """Wipes the entire index."""
+    save_index([])
